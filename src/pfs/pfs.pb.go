@@ -413,7 +413,8 @@ func (m *BranchResponse) GetCommit() *Commit {
 
 type CommitRequest struct {
 	Commit   *Commit `protobuf:"bytes,1,opt,name=commit" json:"commit,omitempty"`
-	Redirect bool    `protobuf:"varint,2,opt,name=redirect" json:"redirect,omitempty"`
+	Acks     int32   `protobuf:"varint,2,opt,name=acks" json:"acks,omitempty"`
+	Redirect bool    `protobuf:"varint,3,opt,name=redirect" json:"redirect,omitempty"`
 }
 
 func (m *CommitRequest) Reset()         { *m = CommitRequest{} }

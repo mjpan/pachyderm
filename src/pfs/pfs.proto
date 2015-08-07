@@ -124,7 +124,8 @@ message BranchResponse {
 
 message CommitRequest {
   Commit commit = 1;
-  bool redirect = 2;
+  int32 acks = 2;
+  bool redirect = 3;
 }
 
 message GetCommitInfoRequest {
