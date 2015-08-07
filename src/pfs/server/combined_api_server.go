@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"strings"
+	"sync"
 
 	"google.golang.org/grpc"
 
@@ -309,32 +310,58 @@ func (a *combinedAPIServer) Commit(ctx context.Context, commitRequest *pfs.Commi
 			}
 		}
 	}
-	//Replicate the commit to replicas.
-	for shard := range shards {
-		reader, err := a.driver.PullDiff(commitRequest.Commit, shard)
-		if err != nil {
-			return nil, err
-		}
-		value, err := ioutil.ReadAll(reader)
-		if err != nil {
-			return nil, err
-		}
-		pushDiffRequest := &pfs.PushDiffRequest{
-			Commit: commitRequest.Commit,
-			Shard:  uint64(shard),
-			Value:  value,
-		}
-		conns, err := a.router.GetAllReplicaClientConns(shard)
-		if err != nil {
-			return nil, err
-		}
-		for _, conn := range conns {
-			if _, err := pfs.NewInternalApiClient(conn).PushDiff(ctx, pushDiffRequest); err != nil {
-				return nil, err
-			}
-		}
+	if err := a.replicate(ctx, commitRequest); err != nil {
+		return nil, err
 	}
 	return emptyInstance, nil
+}
+
+func (a *combinedAPIServer) replicate(ctx context.Context, commitRequest *pfs.CommitRequest) error {
+	var once sync.Once
+	var retError error
+	shards, err := a.getAllShards(false)
+	if err != nil {
+		return err
+	}
+	var wg sync.WaitGroup
+	for shard := range shards {
+		wg.Add(1)
+		go func(shard int) {
+			defer wg.Done()
+			reader, err := a.driver.PullDiff(commitRequest.Commit, shard)
+			if err != nil {
+				once.Do(func() { retError = err })
+				return
+			}
+			value, err := ioutil.ReadAll(reader)
+			if err != nil {
+				once.Do(func() { retError = err })
+				return
+			}
+			pushDiffRequest := &pfs.PushDiffRequest{
+				Commit: commitRequest.Commit,
+				Shard:  uint64(shard),
+				Value:  value,
+			}
+			conns, err := a.router.GetAllReplicaClientConns(shard)
+			if err != nil {
+				once.Do(func() { retError = err })
+				return
+			}
+			for _, conn := range conns {
+				wg.Add(1)
+				go func(conn *grpc.ClientConn) {
+					defer wg.Done()
+					if _, err := pfs.NewInternalApiClient(conn).PushDiff(ctx, pushDiffRequest); err != nil {
+						once.Do(func() { retError = err })
+						return
+					}
+				}(conn)
+			}
+		}(shard)
+	}
+	wg.Wait()
+	return retError
 }
 
 func (a *combinedAPIServer) PullDiff(pullDiffRequest *pfs.PullDiffRequest, apiPullDiffServer pfs.InternalApi_PullDiffServer) error {
