@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"strings"
 
@@ -304,6 +305,31 @@ func (a *combinedAPIServer) Commit(ctx context.Context, commitRequest *pfs.Commi
 					Redirect: true,
 				},
 			); err != nil {
+				return nil, err
+			}
+		}
+	}
+	//Replicate the commit to slaves.
+	for shard := range shards {
+		reader, err := a.driver.PullDiff(commitRequest.Commit, shard)
+		if err != nil {
+			return nil, err
+		}
+		value, err := ioutil.ReadAll(reader)
+		if err != nil {
+			return nil, err
+		}
+		pushDiffRequest := &pfs.PushDiffRequest{
+			Commit: commitRequest.Commit,
+			Shard:  uint64(shard),
+			Value:  value,
+		}
+		conns, err := a.router.GetAllSlaveClientConns(shard)
+		if err != nil {
+			return nil, err
+		}
+		for _, conn := range conns {
+			if _, err := pfs.NewInternalApiClient(conn).PushDiff(ctx, pushDiffRequest); err != nil {
 				return nil, err
 			}
 		}
