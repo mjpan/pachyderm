@@ -13,7 +13,7 @@ func (l *singleAddresser) GetMasterShards(address string) (map[int]bool, error) 
 	return l.newShardMap(), nil
 }
 
-func (l *singleAddresser) GetSlaveShards(address string) (map[int]bool, error) {
+func (l *singleAddresser) GetReplicaShards(address string) (map[int]bool, error) {
 	return l.newShardMap(), nil
 }
 

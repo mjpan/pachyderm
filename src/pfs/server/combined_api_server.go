@@ -309,7 +309,7 @@ func (a *combinedAPIServer) Commit(ctx context.Context, commitRequest *pfs.Commi
 			}
 		}
 	}
-	//Replicate the commit to slaves.
+	//Replicate the commit to replicas.
 	for shard := range shards {
 		reader, err := a.driver.PullDiff(commitRequest.Commit, shard)
 		if err != nil {
@@ -324,7 +324,7 @@ func (a *combinedAPIServer) Commit(ctx context.Context, commitRequest *pfs.Commi
 			Shard:  uint64(shard),
 			Value:  value,
 		}
-		conns, err := a.router.GetAllSlaveClientConns(shard)
+		conns, err := a.router.GetAllReplicaClientConns(shard)
 		if err != nil {
 			return nil, err
 		}
@@ -383,7 +383,7 @@ func (a *combinedAPIServer) ListCommits(ctx context.Context, listCommitsRequest 
 	}, nil
 }
 
-func (a *combinedAPIServer) getShardAndClientConnIfNecessary(path *pfs.Path, slaveOk bool) (int, *grpc.ClientConn, error) {
+func (a *combinedAPIServer) getShardAndClientConnIfNecessary(path *pfs.Path, replicaOk bool) (int, *grpc.ClientConn, error) {
 	shard, err := a.sharder.GetShard(path)
 	if err != nil {
 		return shard, nil, err
@@ -393,16 +393,16 @@ func (a *combinedAPIServer) getShardAndClientConnIfNecessary(path *pfs.Path, sla
 		return shard, nil, err
 	}
 	if !ok {
-		if !slaveOk {
+		if !replicaOk {
 			clientConn, err := a.router.GetMasterClientConn(shard)
 			return shard, clientConn, err
 		}
-		ok, err = a.isLocalSlaveShard(shard)
+		ok, err = a.isLocalReplicaShard(shard)
 		if err != nil {
 			return shard, nil, err
 		}
 		if !ok {
-			clientConn, err := a.router.GetMasterOrSlaveClientConn(shard)
+			clientConn, err := a.router.GetMasterOrReplicaClientConn(shard)
 			return shard, clientConn, err
 		}
 	}
@@ -423,18 +423,18 @@ func (a *combinedAPIServer) getMasterShardOrMasterClientConnIfNecessary() (int, 
 	return -1, clientConn, err
 }
 
-func (a *combinedAPIServer) getAllShards(slaveToo bool) (map[int]bool, error) {
+func (a *combinedAPIServer) getAllShards(replicaToo bool) (map[int]bool, error) {
 	shards, err := a.router.GetMasterShards()
 	if err != nil {
 		return nil, err
 	}
-	if slaveToo {
-		slaveShards, err := a.router.GetSlaveShards()
+	if replicaToo {
+		replicaShards, err := a.router.GetReplicaShards()
 		if err != nil {
 			return nil, err
 		}
-		for slaveShard := range slaveShards {
-			shards[slaveShard] = true
+		for replicaShard := range replicaShards {
+			shards[replicaShard] = true
 		}
 	}
 	return shards, nil
@@ -449,8 +449,8 @@ func (a *combinedAPIServer) isLocalMasterShard(shard int) (bool, error) {
 	return ok, nil
 }
 
-func (a *combinedAPIServer) isLocalSlaveShard(shard int) (bool, error) {
-	shards, err := a.router.GetSlaveShards()
+func (a *combinedAPIServer) isLocalReplicaShard(shard int) (bool, error) {
+	shards, err := a.router.GetReplicaShards()
 	if err != nil {
 		return false, err
 	}

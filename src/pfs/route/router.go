@@ -30,8 +30,8 @@ func (r *router) GetMasterShards() (map[int]bool, error) {
 	return r.addresser.GetMasterShards(r.localAddress)
 }
 
-func (r *router) GetSlaveShards() (map[int]bool, error) {
-	return r.addresser.GetSlaveShards(r.localAddress)
+func (r *router) GetReplicaShards() (map[int]bool, error) {
+	return r.addresser.GetReplicaShards(r.localAddress)
 }
 
 func (r *router) GetMasterClientConn(shard int) (*grpc.ClientConn, error) {
@@ -45,8 +45,8 @@ func (r *router) GetMasterClientConn(shard int) (*grpc.ClientConn, error) {
 	return r.dialer.Dial(address)
 }
 
-func (r *router) GetMasterOrSlaveClientConn(shard int) (*grpc.ClientConn, error) {
-	address, err := r.getAddress(shard, r.addresser.GetSlaveShards)
+func (r *router) GetMasterOrReplicaClientConn(shard int) (*grpc.ClientConn, error) {
+	address, err := r.getAddress(shard, r.addresser.GetReplicaShards)
 	if err != nil {
 		return nil, err
 	}
@@ -56,14 +56,14 @@ func (r *router) GetMasterOrSlaveClientConn(shard int) (*grpc.ClientConn, error)
 			return nil, err
 		}
 		if address == "" {
-			return nil, fmt.Errorf("no slave or master found for %d", shard)
+			return nil, fmt.Errorf("no replica or master found for %d", shard)
 		}
 	}
 	return r.dialer.Dial(address)
 }
 
-func (r *router) GetAllSlaveClientConns(shard int) ([]*grpc.ClientConn, error) {
-	addresses, err := r.getAddresses(shard, r.addresser.GetSlaveShards)
+func (r *router) GetAllReplicaClientConns(shard int) ([]*grpc.ClientConn, error) {
+	addresses, err := r.getAddresses(shard, r.addresser.GetReplicaShards)
 	if err != nil {
 		return nil, err
 	}

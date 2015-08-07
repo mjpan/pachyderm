@@ -27,8 +27,8 @@ func (l *discoveryAddresser) GetMasterShards(address string) (map[int]bool, erro
 	return l.newShardMap(value)
 }
 
-func (l *discoveryAddresser) GetSlaveShards(address string) (map[int]bool, error) {
-	//value, err := l.discoveryClient.Get(address + "-slave")
+func (l *discoveryAddresser) GetReplicaShards(address string) (map[int]bool, error) {
+	//value, err := l.discoveryClient.Get(address + "-replica")
 	//if err != nil {
 	//return nil, err
 	//}

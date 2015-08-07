@@ -18,7 +18,7 @@ func NewSharder(numShards int) Sharder {
 
 type Addresser interface {
 	GetMasterShards(address string) (map[int]bool, error)
-	GetSlaveShards(address string) (map[int]bool, error)
+	GetReplicaShards(address string) (map[int]bool, error)
 	GetAllAddresses() ([]string, error)
 }
 
@@ -32,10 +32,10 @@ func NewDiscoveryAddresser(discoveryClient discovery.Client, baseKey string) Add
 
 type Router interface {
 	GetMasterShards() (map[int]bool, error)
-	GetSlaveShards() (map[int]bool, error)
+	GetReplicaShards() (map[int]bool, error)
 	GetMasterClientConn(shard int) (*grpc.ClientConn, error)
-	GetMasterOrSlaveClientConn(shard int) (*grpc.ClientConn, error)
-	GetAllSlaveClientConns(shard int) ([]*grpc.ClientConn, error)
+	GetMasterOrReplicaClientConn(shard int) (*grpc.ClientConn, error)
+	GetAllReplicaClientConns(shard int) ([]*grpc.ClientConn, error)
 	GetAllClientConns() ([]*grpc.ClientConn, error)
 }
 
