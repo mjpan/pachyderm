@@ -62,25 +62,49 @@ func (r *router) GetMasterOrSlaveClientConn(shard int) (*grpc.ClientConn, error)
 	return r.dialer.Dial(address)
 }
 
-func (r *router) getAddress(shard int, testFunc func(string) (map[int]bool, error)) (string, error) {
+func (r *router) GetAllSlaveClientConns(shard int) ([]*grpc.ClientConn, error) {
+	addresses, err := r.getAddresses(shard, r.addresser.GetSlaveShards)
+	if err != nil {
+		return nil, err
+	}
+	var result []*grpc.ClientConn
+	for _, address := range addresses {
+		conn, err := r.dialer.Dial(address)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, conn)
+	}
+	return result, nil
+}
+
+func (r *router) getAddresses(shard int, testFunc func(string) (map[int]bool, error)) ([]string, error) {
 	addresses, err := r.addresser.GetAllAddresses()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var foundAddresses []string
 	for _, address := range addresses {
 		shards, err := testFunc(address)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if _, ok := shards[shard]; ok {
 			foundAddresses = append(foundAddresses, address)
 		}
 	}
-	if len(foundAddresses) == 0 {
+	return foundAddresses, nil
+}
+
+func (r *router) getAddress(shard int, testFunc func(string) (map[int]bool, error)) (string, error) {
+	addresses, err := r.getAddresses(shard, testFunc)
+	if err != nil {
+		return "", err
+	}
+	if len(addresses) == 0 {
 		return "", nil
 	}
-	return foundAddresses[int(rand.Uint32())%len(foundAddresses)], nil
+	return addresses[int(rand.Uint32())%len(addresses)], nil
 }
 
 func (r *router) GetAllClientConns() ([]*grpc.ClientConn, error) {
